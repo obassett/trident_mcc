@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "trident-mcc"
+version = "0.1.0"
+description = "Monitors NetApp MCC Controllers and detects MCC failover and updates Trident configuration"
+authors = ["Oliver Bassett <oliver@bassett.net.nz>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+black = "^21.6b0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
