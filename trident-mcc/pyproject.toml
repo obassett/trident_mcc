@@ -6,6 +6,8 @@ authors = ["Oliver Bassett <oliver@bassett.net.nz>"]
 
 [tool.poetry.dependencies]
 python = "^3.9"
+netapp-ontap = "^9.9.1"
+kubernetes = "^17.17.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
