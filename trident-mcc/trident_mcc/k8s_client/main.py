@@ -2,6 +2,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import List
+import time
 
 import base64
 
@@ -117,7 +118,7 @@ class K8sclient:
             logger.warning(f"Namespace '{namespace}' was not found")
             return False
 
-    def _get_trident_backends(self) -> List[ResourceInstance] | None:
+    def get_trident_backends(self) -> List[ResourceInstance] | None:
         """Queries K8s API and returns a list of all Trident Backend Configurations
 
         Retrieves TridentBackendConfiguration Objects from K8s API in the Trident Namespace
@@ -126,6 +127,7 @@ class K8sclient:
         :rtype: List[kubernetes.dynamic.resource.ResourceInstance] | None
 
         """
+        start_time = time.time()
         # Get my trident backend api
         logger.debug("Setting up to query trident backends from API Server")
         try:
@@ -161,6 +163,10 @@ class K8sclient:
                 f"No TridentBackendConfigurations found in '{self._trident_namespace}' namespace."
             )
 
+        end_time = time.time()
+        logger.debug(
+            f"get_trident_backends execution took {end_time - start_time:.2f}s"
+        )
         return result if len(result) > 0 else None
 
     def _get_trident_backend_by_name(self, backend_name: str) -> ResourceInstance:
@@ -251,7 +257,7 @@ class K8sclient:
         return result
 
     def _patch_backend_with_svmname(
-        self, trident_backend: ResourceInstance, svm_name: str
+        self, trident_backend: ResourceInstance, svm_name: str, svm_uuid: str
     ) -> bool:
         """Takes the specified trident_backend and svm_name and patches the object.
 
@@ -266,6 +272,7 @@ class K8sclient:
         :rtype: bool
 
         """
+        start_time = time.time()
         logger.debug("Setting up to patch trident backend from API Server")
         # Get my trident backend api
         try:
@@ -285,7 +292,8 @@ class K8sclient:
         # Note that all annotations need to be strings
         if patch_backend["metadata"].get("annotations", None) is None:
             patch_backend["metadata"]["annotations"] = {}
-        patch_backend["metadata"]["annotations"]["trident_mcc_managed"] = "True"
+        patch_backend["metadata"]["annotations"]["trident_mcc_managed"] = str(True)
+        patch_backend["metadata"]["annotations"]["trident_mcc_svm_uuid"] = svm_uuid
         patch_backend["metadata"]["annotations"]["trident_mcc_update_count"] = str(
             int(
                 patch_backend["metadata"]["annotations"].get(
@@ -293,7 +301,7 @@ class K8sclient:
                 )
             )
             + 1
-        )
+        )  # Increment Existing Count to know it is failing over.
 
         # Patch Backend Api.
         logger.debug(
@@ -306,32 +314,37 @@ class K8sclient:
         except Exception as err:
             raise err
 
-        return backend_response
+        logger.info(f"Patch Complete - Validating Result")
+        patched_svm_details = self._get_trident_backend_by_name(
+            backend_response.metadata.name
+        )
 
+        if (
+            patched_svm_details.spec.svm == svm_name
+            and patched_svm_details.metadata.annotations.get("trident_mcc_svm_uuid", "")
+            == svm_uuid
+        ):
+            logger.info(
+                f"Successfully Patched Backend with new svm-name and annotations"
+            )
+            response = True
+        else:
+            logger.error(
+                f"Unable to patch TridentBackedConfig '{trident_backend.metadata.name}' to correct SVM Name"
+            )
 
-# trident_backend_api = k8sclient.resources.get(
-#     api_version="trident.netapp.io/v1", kind="TridentBackendConfig"
-# )
+        end_time = time.time()
+        logger.debug(
+            f"_patch_backend_with_svmname execution took {end_time - start_time:.2f}s"
+        )
+        return response
 
+    def get_na_connection_properties(self, trident_backend_config):
+        """Takes Trident Backend Config and Returns a dict that can be passed to NetApp client"""
 
-# def get_tbc_from_namespace(namespace: str) -> List:
+        response = {"management_lif": trident_backend_config.spec.managementLIF}
 
-#     pass
+        secrets = self._decode_secrets(self._get_backend_secret(trident_backend_config))
+        response.update(**secrets)
 
-
-# # When actually doing the get we can specify name directly and namespace. Also likely useful doing the patch.
-# test1 = trident_backend_api.get(name="test-ontap-nas",namespace="trident")
-
-
-# spec_file = test1.to_dict()
-
-# # Patch SVM Name
-# spec_file['spec']['svm'] = 'k8s_01'
-
-# test2 = trident_backend_api.patch(body=spec_file, content_type="application/merge-patch+json")
-
-# # print(type(test1))
-# # print(dir(test1))
-# # print(json.dumps(test1.to_dict(), indent=4))
-# # print("--------------------")
-# # print(json.dumps(test2.to_dict(), indent=4))
+        return response
