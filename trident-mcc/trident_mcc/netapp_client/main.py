@@ -102,7 +102,7 @@ class NetAppClient:
         elif len(svm_list) == 1:
             svm = svm_list[0]
             logger.info(
-                f"Found a single SVM '{svm.name}' on managmenet interface. Retieving Details"
+                f"Found a single SVM '{svm.name}' on management interface. Retieving Details"
             )
             response = self._get_svm_details(svm)
         end_time = time.time()
