@@ -231,7 +231,7 @@ class K8sclient:
         except Exception as err:
             logger.error(f"Unable to retrieve secret '{secret_name}'.")
             raise err
-        logger.info(f"Successfully retrieved secret '{secret_name}'.")
+        logger.debug(f"Successfully retrieved secret '{secret_name}'.")
         return backend_response
 
     def _decode_secrets(self, secret: ResourceInstance) -> dict:
@@ -252,7 +252,7 @@ class K8sclient:
             raise ValueError("")
 
         if len(result) > 0:
-            logger.info("Successfully decoded secrets")
+            logger.debug("Successfully decoded secrets")
 
         return result
 
