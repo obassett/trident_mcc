@@ -1,15 +1,15 @@
 [tool.poetry]
 name = "trident-mcc"
-version = "0.1.0"
-description = "Monitors NetApp MCC Controllers and detects MCC failover and updates Trident configuration"
+version = "0.1.0-beta"
+description = "Monitors NetApp Controllers and detects SVM Name Change (because of MetroCluster failover) and updates Trident configuration"
 authors = ["Oliver Bassett <oliver@bassett.net.nz>"]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.7"
 netapp-ontap = "^9.9.1"
 kubernetes = "^17.17.0"
-starlette = "^0.15.0"
 uvicorn = "^0.14.0"
+fastapi = "^0.65.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

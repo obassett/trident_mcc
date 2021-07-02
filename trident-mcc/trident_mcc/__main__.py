@@ -10,6 +10,7 @@ import time
 import json
 import trident_mcc.k8s_client as k8s_client
 import trident_mcc.netapp_client as na_client
+from trident_mcc.models import StateEnum, StatusUpdate
 
 # What do we want to configure
 # ---------------------------
@@ -24,6 +25,7 @@ DEBUG = os.getenv("DEBUG", None)
 POLLING_INTERVAL = int(os.getenv("POLLING_INTERVAL", 300))
 TRIDENT_NAMESPACE = os.getenv("TRIDENT_NAMESPACE", "trident")
 KUBE_CONFIG_LOCATION = os.getenv("KUBE_CONFIG_LOCATION", None)
+
 
 ###
 # Initialise logging

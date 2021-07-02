@@ -1,49 +1,99 @@
-from starlette.applications import Starlette
-from starlette.responses import Response, HTMLResponse
-from starlette.routing import Route
+from __future__ import annotations
+from email import message
+import os
+import logging
+from typing import Optional
 
-from enum import Enum
+from datetime import datetime, timedelta
+from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel
+from enum import Enum, IntEnum
 
 
-class AppState(Enum):
-    OK = 200
-    STARTING = 100
-    ERROR = 500
+from trident_mcc.models import (
+    AppHealth,
+    StateEnum,
+    StatusUpdate,
+    StateMessageEnum,
+    lookup_status_message,
+)
 
 
-async def healthz(request):
+app = FastAPI()
+
+# Environment Variables -
+DEBUG = os.getenv("DEBUG", None)
+POLLING_INTERVAL = int(os.getenv("POLLING_INTERVAL", 300))
+
+# Set Up Logging
+if DEBUG:
+    loggerlevel = logging.DEBUG
+    app_debug = True
+    logging.getLogger("uvicorn.error").setLevel(loggerlevel)
+    logging.getLogger("uvicorn.access").setLevel(loggerlevel)
+else:
+    loggerlevel = logging.INFO
+    app_debug = False
+
+# Create Logger with Applicaiton Name
+logger = logging.getLogger("trident_mcc.healthz")
+# Set Level based on DEBUG environment Variable
+logger.setLevel(loggerlevel)
+ch = logging.StreamHandler()  # Std Err Logging
+# Format Log Output - 2021-01-23 00:00:00:trident_mcc.module:INFO - Message
+log_formatter = logging.Formatter(
+    "%(asctime)s:%(name)s.%(module)s:%(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+ch.setFormatter(log_formatter)
+logger.addHandler(ch)
+
+
+@app.get("/healthz")
+async def healthz():
     """Kubernetees Health Check"""
-    logging.debug(f"Received health check request - current state: {app.state.HEALTH}")
-    if (
-        app.state.HEALTH_LAST_UPDATE
-        + timedelta(seconds=(app.state.POLLING_INTERVAL + 10))
-        < datetime.now()
-    ):  # Make sure app state is updated at least every Polling interval + 10 seconds (This should be enough time to run)
-        logging.debug(
-            f"Received health check request - Last Update: {app.state.HEALTH_LAST_UPDATE} "
+    logger.debug(f"Received health check request - current state: {app_state.state} ")
+    await app_state.validate_status(POLLING_INTERVAL)
+
+    lookup_status_message(app_state.state)
+    if app_state.message:
+        response_content = " - ".join(
+            [lookup_status_message(app_state.state), app_state.message]
         )
-        response = Response(content="ERROR", status_code=500)
-    elif app.state.HEALTH == AppState.OK:  # We are healthy Return OK
-        response = Response(content="OK", status_code=200)
-    elif app.state.HEALTH == AppState.STARTING:  # We are still starting.
-        response = Response(content="Starting Up", status_code=202)
-    else:  # If nothing else matches then return not okay.
-        response = Response(content="ERROR", status_code=500)
+    else:
+        response_content = lookup_status_message(app_state.state)
+
+    response = PlainTextResponse(status_code=app_state.state, content=response_content)
 
     return response
 
 
+@app.post("/update_status")
+async def update_status(status_update: StatusUpdate):
+    """Updates the application status with state and timestamp
+
+    This is called via the /update_status endpoint with a POST operation.
+    """
+    logger.debug(
+        f"/update_status - Received Application Status Update - {status_update} "
+    )
+    await app_state.update_status(status_update)
+
+    if app_state.state == status_update.state:
+        logger.info(f"/update_status - Successfully Updated status")
+        return PlainTextResponse(content="OK", status_code=200)
+    else:
+        logger.warning(f"/update_status - Unable to set status")
+        return PlainTextResponse(content="FAILED", status_code=500)
+
+
+@app.on_event("startup")
 async def startup():
     """Startup Tasks"""
-    logger.info("Application Starting Up")
-    # Set Health State
-    app.state.HEALTH = AppState.STARTING
-    app.state.HEALTH_LAST_UPDATE = datetime.now()
-    app.state.POLLING_INTERVAL = POLLING_INTERVAL
-
-
-# Define HTTP Routes
-routes = [Route("/healthz", healthz)]
-
-#
-app = Starlette(debug=app_debug, routes=routes, on_startup=[startup])
+    logger.info("Healthcheck Application Starting Up")
+    # Initialize State
+    global app_state
+    app_state = AppHealth(
+        state=StateEnum.STARTING, message="Application Starting - No Updates Recieved"
+    )
