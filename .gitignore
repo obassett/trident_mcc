@@ -130,4 +130,3 @@ dmypy.json
 
 # Ignore temp directories
 temp/
-deployment/

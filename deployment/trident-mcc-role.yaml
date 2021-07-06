@@ -1,0 +1,24 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: trident-mcc-role
+  namespace: trident
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - head
+  - list
+- apiGroups:
+  - trident.netapp.io
+  resources:
+  - tridentbackendconfigs
+  verbs:
+  - get
+  - head
+  - patch
+  - list
