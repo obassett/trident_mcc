@@ -43,9 +43,11 @@ class K8sclient:
                 self._kube_config = k8sconfig.load_incluster_config()
             except ConfigException as err:
                 logger.error(
-                    f"Unable to load incluster configuration - expected to be running inside a pod"
+                    f"Unable to load in-cluster configuration - expected to be running inside a pod"
                 )
-                raise err
+                raise ConfigException(
+                    f"Unable to load in-cluster configuration - expected to be running inside a pod"
+                )
         elif isinstance(kube_config, str):
             # Make sure that file exists
             if Path(kube_config).is_file() and Path(kube_config).exists():
