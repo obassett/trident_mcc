@@ -9,7 +9,11 @@ import base64
 from kubernetes import config as k8sconfig, dynamic
 from kubernetes.config import ConfigException
 from kubernetes.client import api_client
-from kubernetes.dynamic.exceptions import NotFoundError, ResourceNotFoundError
+from kubernetes.dynamic.exceptions import (
+    NotFoundError,
+    ResourceNotFoundError,
+    ApiException,
+)
 from kubernetes.dynamic.resource import ResourceField, ResourceInstance
 
 
@@ -116,6 +120,11 @@ class K8sclient:
             if result:
                 logger.info(f"Sucessfully found namespace '{namespace}'")
                 return True
+        except ApiException as err:
+            logger.critical(
+                f"Access to API Forbidden, if using in-cluster config check service-account permissions"
+            )
+            raise err
         except NotFoundError as err:
             logger.warning(f"Namespace '{namespace}' was not found")
             return False
