@@ -9,6 +9,7 @@ import time
 from fastapi import responses
 
 import requests
+from requests.exceptions import ConnectionError
 
 import json
 import trident_mcc.k8s_client as k8s_client
@@ -117,11 +118,17 @@ def update_healthcheck(status_update: StatusUpdate):
 
     try:
         response = requests.post(url=APIURL, data=status_update.json(), headers=headers)
-    except Exception as err:
-        raise err
-
-    if response.status_code == 200:
-        logger.debug(f"Successfully updated status with healthcheck  ")
+    except ConnectionError as err:
+        logger.error(
+            f"Unable to connect to Healthcheck Service - Make sure it is running"
+        )
+    else:
+        if response.status_code == 200:
+            logger.debug(f"Successfully updated status with healthcheck service")
+        else:
+            logger.error(
+                f"Update to Healthcheck Service failed with status_code {response.status_code}"
+            )
 
     end_time = time.time()
     logger.debug(f"update_healthcheck finished in {end_time - start_time:.2f}s")
@@ -133,7 +140,20 @@ def check_backends():
     all_backends_count = 0
     managed_backend_count = 0
     patch_count = 0
-    for trident_config in k8sclient.get_trident_backends():
+
+    trident_backends = k8sclient.get_trident_backends()
+    if not trident_backends:
+        status_message = f"No Backends found"
+        logger.info(status_message)
+        update_healthcheck(
+            StatusUpdate(
+                state=StateEnum.OK,
+                message=status_message,
+            )
+        )
+        return
+
+    for trident_config in trident_backends:
         be_name = trident_config.metadata.name
         logger.debug(f"Processing TridentBackendConfig - '{be_name}'")
         # For Each Backend
